@@ -29,7 +29,6 @@ export class HUD {
   private minimapCtx!: CanvasRenderingContext2D;
   private terrainCache: HTMLCanvasElement | null = null;
   private overlayEl!: HTMLElement;
-  private unitHintEl!: HTMLElement;
   private helpEl!: HTMLElement;
   private helpCloseBtn!: HTMLButtonElement;
   private hasStarted = false;
@@ -106,7 +105,6 @@ export class HUD {
       btn.dataset.group = 'units';
       btn.style.display = 'none';
     }
-    this.unitHintEl = this.el('div', 'unit-hint', this.panelEl, '');
     this.el('div', 'queue-title', this.panelEl, '生产队列（点击取消）');
     this.queueEl = this.el('div', 'queue', this.panelEl);
 
@@ -164,8 +162,10 @@ export class HUD {
               <li>① 工程车按 <kbd>F</kbd> 部署为指挥中心</li>
               <li>② 建<b>发电站</b>供电（缺电会停产、防御塔瘫痪）</li>
               <li>③ 建<b>资源精炼厂</b>，附赠采矿车自动赚钱</li>
-              <li>④ 建<b>兵营</b> / <b>战车工厂</b>爆兵，<b>防御塔</b>守家</li>
-              <li>⑤ 攒一波装甲部队，端掉对面老家</li>
+              <li>④ 回“建筑”页，在指挥中心旁绿色区域内建<b>兵营</b></li>
+              <li>⑤ 兵营完工后打开“单位”页训练<b>步兵</b></li>
+              <li>⑥ 精炼厂 → <b>战车工厂</b>解锁坦克，<b>防御塔</b>守家</li>
+              <li>⑦ 攒一波装甲部队，端掉对面老家</li>
             </ul>
           </div>
         </div>
@@ -284,20 +284,6 @@ export class HUD {
       if (costEl) costEl.textContent = ok ? `$${st.cost}` : `需要${st.producer ? BUILDING_STATS[st.producer].name : ''}`;
     }
 
-    // 单位页引导提示
-    if (this.tab === 'units') {
-      const hasBarracks = scene.hasProducer('player', 'barracks');
-      const hasFactory = scene.hasProducer('player', 'warFactory');
-      this.unitHintEl.style.display = '';
-      this.unitHintEl.innerHTML = !hasBarracks
-        ? '造兵步骤：「建筑」页先建<b>发电站</b>，再建<b>兵营</b>（放在指挥中心旁绿色区域内），完工后回本页点<b>步兵</b>。'
-        : hasFactory
-          ? ''
-          : '兵营已就绪，点下方按钮即可出兵。坦克类需要：精炼厂 → <b>战车工厂</b>。';
-      this.unitHintEl.style.display = this.unitHintEl.innerHTML === '' ? 'none' : '';
-    } else {
-      this.unitHintEl.style.display = 'none';
-    }
   }
 
   private refreshQueue(scene: GameScene, snap: HudSnapshot): void {
