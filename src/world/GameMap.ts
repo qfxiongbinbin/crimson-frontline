@@ -20,12 +20,15 @@ export class GameMap {
   readonly scene: GameScene;
   tiles = new Uint8Array(MAP_W * MAP_H);
   ore = new Uint16Array(MAP_W * MAP_H);
+  groundVariant = new Uint8Array(MAP_W * MAP_H);
   /** 被建筑占用的格子 */
   blocked = new Uint8Array(MAP_W * MAP_H);
+  revision = 0;
   private gfx: Phaser.GameObjects.RenderTexture;
 
   constructor(scene: GameScene) {
     this.scene = scene;
+    this.groundVariant.fill(255);
     this.generate();
     this.gfx = scene.add
       .renderTexture(0, 0, MAP_W * TILE, MAP_H * TILE)
@@ -105,6 +108,7 @@ export class GameMap {
 
   redrawTile(tx: number, ty: number): void {
     this.drawTile(tx, ty);
+    this.revision++;
   }
 
   private drawTile(tx: number, ty: number): void {
@@ -114,7 +118,9 @@ export class GameMap {
     const t = this.tiles[this.idx(tx, ty)];
     const h = hash(tx, ty);
     const groundTints = [0xffffff, 0xeeeadd, 0xe4e8d8];
-    g.drawFrame(`tile-ground-${h % 4}`, undefined, x, y, 1, groundTints[h % groundTints.length]);
+    const override = this.groundVariant[this.idx(tx, ty)];
+    const variant = override === 255 ? h % 4 : override;
+    g.drawFrame(`tile-ground-${variant}`, undefined, x, y, 1, groundTints[h % groundTints.length]);
     if (t === T_ROCK) g.drawFrame('tile-rock', undefined, x, y);
     if (t === T_ORE) g.drawFrame('tile-ore', undefined, x, y);
   }
@@ -148,6 +154,31 @@ export class GameMap {
   oreAt(tx: number, ty: number): number {
     if (!this.inBounds(tx, ty)) return 0;
     return this.ore[this.idx(tx, ty)];
+  }
+
+  placeGroundPatch(tx: number, ty: number, w: number, h: number): void {
+    for (let y = ty; y < ty + h; y++) {
+      for (let x = tx; x < tx + w; x++) {
+        if (!this.inBounds(x, y)) continue;
+        const i = this.idx(x, y);
+        this.tiles[i] = T_GROUND;
+        this.ore[i] = 0;
+        this.groundVariant[i] = 0;
+        this.redrawTile(x, y);
+      }
+    }
+  }
+
+  placeOreDeposit(tx: number, ty: number, w: number, h: number, valuePerTile: number): void {
+    for (let y = ty; y < ty + h; y++) {
+      for (let x = tx; x < tx + w; x++) {
+        if (!this.inBounds(x, y)) continue;
+        const i = this.idx(x, y);
+        this.tiles[i] = T_ORE;
+        this.ore[i] = valuePerTile;
+        this.redrawTile(x, y);
+      }
+    }
   }
 
   /** 从矿石格扣减，返回实际采到的量 */

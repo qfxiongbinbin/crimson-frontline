@@ -1,7 +1,9 @@
 import {
+  BUILDABLE_KINDS,
   BUILDING_KINDS,
   BUILDING_STATS,
   BUILD_PREREQ,
+  FORTIFICATION_KINDS,
   UNIT_KINDS,
   UNIT_STATS,
   WORLD_H,
@@ -14,6 +16,7 @@ import type { GameScene } from '../scenes/GameScene';
 
 const MINIMAP_SIZE = 192;
 const RADAR_POWER_REQUIRED = 30;
+type BuildTab = 'buildings' | 'fortifications' | 'units';
 
 /** DOM HUD：顶部资源栏、右侧雷达建造面板、底部选中信息、胜负遮罩 */
 export class HUD {
@@ -32,12 +35,14 @@ export class HUD {
   private radarStatusEl!: HTMLElement;
   private radarOnline = false;
   private terrainCache: HTMLCanvasElement | null = null;
+  private terrainRevision = -1;
   private overlayEl!: HTMLElement;
   private helpEl!: HTMLElement;
   private helpCloseBtn!: HTMLButtonElement;
   private hasStarted = false;
   private toastTimer = 0;
-  private tab: 'buildings' | 'units' = 'buildings';
+  private tab: BuildTab = 'buildings';
+  private tabButtons = new Map<BuildTab, HTMLButtonElement>();
   private buttons = new Map<string, HTMLButtonElement>();
 
   constructor(game: Phaser.Game) {
@@ -110,15 +115,19 @@ export class HUD {
     });
 
     const tabs = this.el('div', 'tabs', this.panelEl);
-    const tabB = document.createElement('button');
-    tabB.textContent = '建筑';
-    tabB.className = 'tab active';
-    const tabU = document.createElement('button');
-    tabU.textContent = '单位';
-    tabU.className = 'tab';
-    tabs.append(tabB, tabU);
-    tabB.onclick = () => this.switchTab('buildings', tabB, tabU);
-    tabU.onclick = () => this.switchTab('units', tabB, tabU);
+    const tabDefs: [BuildTab, string][] = [
+      ['buildings', '建筑'],
+      ['fortifications', '工事'],
+      ['units', '单位'],
+    ];
+    for (const [group, label] of tabDefs) {
+      const button = document.createElement('button');
+      button.textContent = label;
+      button.className = `tab${group === 'buildings' ? ' active' : ''}`;
+      button.onclick = () => this.switchTab(group);
+      tabs.appendChild(button);
+      this.tabButtons.set(group, button);
+    }
 
     const grid = this.el('div', 'btn-grid', this.panelEl);
     for (const kind of BUILDING_KINDS) {
@@ -127,6 +136,14 @@ export class HUD {
         this.getScene()?.uiAction(this.scene?.placement === kind ? 'cancelPlace' : 'place', kind),
       );
       btn.dataset.group = 'buildings';
+    }
+    for (const kind of FORTIFICATION_KINDS) {
+      const st = BUILDING_STATS[kind];
+      const btn = this.makeButton(grid, `b-${kind}`, st.name, st.cost, st.desc, () =>
+        this.getScene()?.uiAction(this.scene?.placement === kind ? 'cancelPlace' : 'place', kind),
+      );
+      btn.dataset.group = 'fortifications';
+      btn.style.display = 'none';
     }
     for (const kind of UNIT_KINDS) {
       const st = UNIT_STATS[kind];
@@ -178,7 +195,8 @@ export class HUD {
               <li>④ 回“建筑”页，在指挥中心旁绿色区域内建<b>兵营</b></li>
               <li>⑤ 兵营完工后打开“单位”页训练<b>步兵</b></li>
               <li>⑥ 精炼厂 → <b>战车工厂</b>解锁坦克，<b>防御塔</b>守家</li>
-              <li>⑦ 攒一波装甲部队，端掉对面老家</li>
+              <li>⑦ “工事”页可部署城墙、障碍、警戒灯与矿脉</li>
+              <li>⑧ 攒一波装甲部队，端掉对面老家</li>
             </ul>
           </div>
         </div>
@@ -235,14 +253,11 @@ export class HUD {
     return btn;
   }
 
-  private switchTab(tab: 'buildings' | 'units', tabB: HTMLButtonElement, tabU: HTMLButtonElement): void {
+  private switchTab(tab: BuildTab): void {
     this.tab = tab;
-    tabB.classList.toggle('active', tab === 'buildings');
-    tabU.classList.toggle('active', tab === 'units');
+    for (const [group, button] of this.tabButtons) button.classList.toggle('active', tab === group);
     for (const [key, btn] of this.buttons) {
-      const show =
-        (tab === 'buildings' && btn.dataset.group === 'buildings') ||
-        (tab === 'units' && btn.dataset.group === 'units');
+      const show = btn.dataset.group === tab;
       btn.style.display = show ? '' : 'none';
       void key;
     }
@@ -277,7 +292,7 @@ export class HUD {
   }
 
   private refreshButtons(scene: GameScene, snap: HudSnapshot): void {
-    for (const kind of BUILDING_KINDS) {
+    for (const kind of BUILDABLE_KINDS) {
       const btn = this.buttons.get(`b-${kind}`)!;
       const st = BUILDING_STATS[kind];
       const need = BUILD_PREREQ[kind];
@@ -369,7 +384,10 @@ export class HUD {
       this.terrainCache = document.createElement('canvas');
       this.terrainCache.width = S;
       this.terrainCache.height = S;
+    }
+    if (this.terrainRevision !== scene.map.revision) {
       const tc = this.terrainCache.getContext('2d')!;
+      tc.clearRect(0, 0, S, S);
       const map = scene.map;
       for (let ty = 0; ty < 64; ty++) {
         for (let tx = 0; tx < 64; tx++) {
@@ -378,6 +396,7 @@ export class HUD {
           tc.fillRect((tx / 64) * S, (ty / 64) * S, S / 64 + 0.5, S / 64 + 0.5);
         }
       }
+      this.terrainRevision = scene.map.revision;
     }
     ctx.drawImage(this.terrainCache, 0, 0);
     // 迷雾

@@ -5,6 +5,7 @@ import {
   DIFFICULTY,
   ENEMY_START_CREDITS,
   MAX_QUEUE,
+  ORE_PER_TILE,
   START_CREDITS,
   TILE,
   UNIT_STATS,
@@ -321,16 +322,42 @@ export class GameScene extends Phaser.Scene {
       sfx.error();
       return;
     }
-    this.credits.player -= BUILDING_STATS[kind].cost;
-    this.placeBuilding(kind, 'player', tx, ty);
-    this.pushMessage(`开始建造：${BUILDING_STATS[kind].name}`);
+    const stats = BUILDING_STATS[kind];
+    this.credits.player -= stats.cost;
+    if (stats.terrainEffect) {
+      this.placeTerrainProject(kind, tx, ty);
+      this.pushMessage(`部署完成：${stats.name}`);
+      sfx.ready();
+    } else {
+      this.placeBuilding(kind, 'player', tx, ty);
+      this.pushMessage(`开始建造：${stats.name}`);
+    }
     this.placement = null;
     this.ghost.clear();
+  }
+
+  placeTerrainProject(kind: BuildingKind, tx: number, ty: number): boolean {
+    const stats = BUILDING_STATS[kind];
+    const [wt, ht] = stats.size;
+    if (stats.terrainEffect === 'ground') {
+      this.map.placeGroundPatch(tx, ty, wt, ht);
+      return true;
+    }
+    if (stats.terrainEffect === 'ore') {
+      this.map.placeOreDeposit(tx, ty, wt, ht, stats.orePerTile ?? ORE_PER_TILE);
+      return true;
+    }
+    return false;
   }
 
   canPlace(kind: BuildingKind, tx: number, ty: number, faction: Faction): boolean {
     const [wt, ht] = BUILDING_STATS[kind].size;
     if (tx < 1 || ty < 1 || tx + wt >= 63 || ty + ht >= 63) return false;
+    for (const b of this.buildings) {
+      if (!b.alive) continue;
+      const overlaps = tx < b.tx + b.wt && tx + wt > b.tx && ty < b.ty + b.ht && ty + ht > b.ty;
+      if (overlaps) return false;
+    }
     for (let y = ty; y < ty + ht; y++) {
       for (let x = tx; x < tx + wt; x++) {
         if (!this.map.isWalkable(x, y)) return false;
@@ -340,6 +367,7 @@ export class GameScene extends Phaser.Scene {
     // 建造范围：与任意己方建筑的距离不超过 BUILD_RADIUS
     for (const b of this.buildings) {
       if (b.faction !== faction || !b.alive) continue;
+      if (b.stats.canAnchorBuild === false) continue;
       const dx = Math.max(b.tx - (tx + wt), tx - (b.tx + b.wt), 0);
       const dy = Math.max(b.ty - (ty + ht), ty - (b.ty + b.ht), 0);
       if (Math.hypot(dx, dy) <= BUILD_RADIUS) return true;
@@ -348,9 +376,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   placeBuilding(kind: BuildingKind, faction: Faction, tx: number, ty: number, instant = false): Building | null {
+    if (BUILDING_STATS[kind].terrainEffect) return null;
     const b = new Building(this, kind, faction, tx, ty, instant);
     this.buildings.push(b);
-    this.map.blockFootprint(tx, ty, b.wt, b.ht, true);
+    if (b.stats.blocksMovement !== false) this.map.blockFootprint(tx, ty, b.wt, b.ht, true);
     return b;
   }
 
@@ -560,11 +589,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   onEntityDied(e: BaseEntity): void {
-    const big = e instanceof Building;
+    const big = e instanceof Building && !e.stats.textureKey;
     explosion(this, e.x, e.y, big);
     if (this.fog.isVisibleWorld(e.x, e.y) || e.faction === 'player') sfx.boom(big);
     if (e instanceof Building) {
-      this.map.blockFootprint(e.tx, e.ty, e.wt, e.ht, false);
+      if (e.stats.blocksMovement !== false) this.map.blockFootprint(e.tx, e.ty, e.wt, e.ht, false);
     }
     if (this.selected.includes(e)) {
       this.selected = this.selected.filter((s) => s !== e);

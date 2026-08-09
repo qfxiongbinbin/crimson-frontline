@@ -18,6 +18,13 @@ import ground2 from './terrain/ground-2.png';
 import ground3 from './terrain/ground-3.png';
 import ore from './terrain/ore.png';
 import rock from './terrain/rock.png';
+import antiTank from './props/anti-tank.png';
+import beacon from './props/beacon.png';
+import crater from './props/crater.png';
+import crates from './props/crates.png';
+import sandbags from './props/sandbags.png';
+import wall from './props/wall.png';
+import wreck from './props/wreck.png';
 import harvesterEnemy from './units/harvester-enemy.png';
 import harvesterPlayer from './units/harvester-player.png';
 import heavyTankEnemy from './units/heavyTank-enemy.png';
@@ -52,6 +59,13 @@ export const GENERATED_TEXTURES: Record<string, string> = {
   'tile-ground-3': ground3,
   'tile-ore': ore,
   'tile-rock': rock,
+  'prop-anti-tank': antiTank,
+  'prop-beacon': beacon,
+  'prop-crater': crater,
+  'prop-crates': crates,
+  'prop-sandbags': sandbags,
+  'prop-wall': wall,
+  'prop-wreck': wreck,
   'u-harvester-enemy': harvesterEnemy,
   'u-harvester-player': harvesterPlayer,
   'u-heavyTank-enemy': heavyTankEnemy,

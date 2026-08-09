@@ -287,6 +287,48 @@ async function main() {
   }, routeProbe);
   report('单位可绕过建筑继续执行移动命令', routeCheck.found && routeCheck.reached, JSON.stringify({ ...routeCheck, targetX: routeProbe.targetX }));
 
+  // --- T8b 工事页：素材、阻挡与地图工程 ---
+  const fortCheck = await g(() => {
+    const game = window.__game;
+    const buttons = [...document.querySelectorAll('#btn-grid .build-btn')].filter(
+      (b) => b.dataset.group === 'fortifications',
+    );
+    const wall = game.placeBuilding('wall', 'player', 2, 2, true);
+    const wallBlocks = game.map.blocked[game.map.idx(2, 2)] === 1;
+    const crater = game.placeBuilding('crater', 'player', 5, 2, true);
+    const craterPassable = game.map.blocked[game.map.idx(5, 2)] === 0;
+    game.placeTerrainProject('groundPatch', 2, 5);
+    game.placeTerrainProject('oreDeposit', 5, 5);
+    const groundPlaced = game.map.groundVariant[game.map.idx(2, 5)] === 0;
+    const oreBefore = game.map.oreAt(5, 5);
+    const mined = game.map.depleteOre(5, 5, 50);
+    const oreAfter = game.map.oreAt(5, 5);
+    const remoteWall = game.placeBuilding('wall', 'player', 55, 55, true);
+    const cannotChain = !game.canPlace('wall', 57, 55, 'player');
+    wall?.takeDamage(999999);
+    crater?.takeDamage(999999);
+    remoteWall?.takeDamage(999999);
+    return {
+      buttonCount: buttons.length,
+      labels: buttons.map((b) => b.textContent?.trim()),
+      wallBlocks,
+      craterPassable,
+      groundPlaced,
+      oreBefore,
+      mined,
+      oreAfter,
+      cannotChain,
+    };
+  });
+  report('工事页包含十种可建设素材', fortCheck.buttonCount === 10, fortCheck.labels.join('、'));
+  report('城墙阻挡而弹坑允许单位穿行', fortCheck.wallBlocks && fortCheck.craterPassable);
+  report(
+    '路面铺装与人工矿脉会修改地图格',
+    fortCheck.groundPlaced && fortCheck.oreBefore === 300 && fortCheck.mined === 50 && fortCheck.oreAfter === 250,
+    `ore=${fortCheck.oreBefore}→${fortCheck.oreAfter}`,
+  );
+  report('工事不能接龙扩张建造范围', fortCheck.cannotChain);
+
   // --- T9 AI 发展（必须在战斗机制的敌军清场前验证） ---
   st = await state();
   const enemyBuildings = st.buildings.filter((b) => b.faction === 'enemy').length;

@@ -248,6 +248,7 @@ export class BootScene extends Phaser.Scene {
         tex(this, `u-${kind}-${f}`, s, s, (g) => unitDraws[kind](g, s));
       });
       (Object.keys(BUILDING_STATS) as BuildingKind[]).forEach((kind) => {
+        if (BUILDING_STATS[kind].textureKey) return;
         const [wt, ht] = BUILDING_STATS[kind].size;
         tex(this, `b-${kind}-${f}`, wt * TILE, ht * TILE, (g) => drawBuilding(g, kind, c));
       });

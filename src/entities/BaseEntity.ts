@@ -60,7 +60,8 @@ export abstract class BaseEntity extends Phaser.GameObjects.Container {
       g.lineStyle(2, 0x86ff7a, 0.95);
       g.strokeEllipse(0, 0, this.footW, this.footW * 0.62);
     }
-    // 血条
+    // 血条：仅选中或受损时显示，避免密集工事遮挡画面
+    if (!this.selected && this.hp >= this.maxHp) return;
     const w = Math.max(26, this.footW * 0.8);
     const ratio = this.hp / this.maxHp;
     const color = ratio > 0.6 ? 0x51d94f : ratio > 0.3 ? 0xe8b23a : 0xe0483a;

@@ -26,6 +26,8 @@ export class Building extends BaseEntity {
   private plantFlameTimer = 0;
   private plantArcTimer = Phaser.Math.FloatBetween(0.8, 1.8);
   private plantSmokeSide = 1;
+  private beaconGlow: Phaser.GameObjects.Arc | null = null;
+  private beaconClock = 0;
 
   constructor(scene: GameScene, kind: BuildingKind, faction: Faction, tx: number, ty: number, instant = false) {
     const stats = BUILDING_STATS[kind];
@@ -38,9 +40,10 @@ export class Building extends BaseEntity {
     this.ty = ty;
     this.wt = stats.size[0];
     this.ht = stats.size[1];
+    const [visualW, visualH] = stats.visualSize ?? [stats.size[0] * TILE, stats.size[1] * TILE];
     const body = scene.add
-      .image(0, 0, `b-${kind}-${faction}`)
-      .setDisplaySize(stats.size[0] * TILE, stats.size[1] * TILE);
+      .image(0, 0, stats.textureKey ?? `b-${kind}-${faction}`)
+      .setDisplaySize(visualW, visualH);
     this.add(body);
     if (kind === 'powerPlant') {
       this.plantFx = scene.add.container(0, 0);
@@ -53,6 +56,11 @@ export class Building extends BaseEntity {
       this.plantStackLights = [leftStack, rightStack];
       this.plantFx.add([this.plantGlow, ...this.plantStackLights]);
       this.add(this.plantFx);
+    }
+    if (kind === 'beacon') {
+      this.beaconGlow = scene.add.circle(0, -2, 10, 0xff6b22, 0.24);
+      this.beaconGlow.setBlendMode(Phaser.BlendModes.ADD);
+      this.add(this.beaconGlow);
     }
     this.rallyGfx = scene.add.graphics();
     this.add(this.rallyGfx);
@@ -78,11 +86,11 @@ export class Building extends BaseEntity {
   }
 
   get footW(): number {
-    return this.wt * TILE + 12;
+    return Math.max(this.wt * TILE, this.stats.visualSize?.[0] ?? 0) + 12;
   }
 
   get barY(): number {
-    return (-this.ht * TILE) / 2 - 12;
+    return -Math.max(this.ht * TILE, this.stats.visualSize?.[1] ?? 0) / 2 - 12;
   }
 
   get isProducer(): boolean {
@@ -146,6 +154,14 @@ export class Building extends BaseEntity {
       }
     }
     if (this.kind === 'powerPlant') this.updatePowerPlantEffects(dt);
+    if (this.kind === 'beacon') this.updateBeaconEffects(dt);
+  }
+
+  private updateBeaconEffects(dt: number): void {
+    if (!this.beaconGlow) return;
+    this.beaconClock += dt;
+    const pulse = Math.pow(Math.max(0, Math.sin(this.beaconClock * 5.5)), 3);
+    this.beaconGlow.setAlpha(0.08 + pulse * 0.42).setScale(0.75 + pulse * 0.55);
   }
 
   private updatePowerPlantEffects(dt: number): void {
