@@ -364,10 +364,10 @@ export class GameScene extends Phaser.Scene {
         if (this.map.oreAt(x, y) > 0) return false;
       }
     }
-    // 建造范围：与任意己方建筑的距离不超过 BUILD_RADIUS
+    // 固定建造范围：只有指挥中心提供半径，其他建筑与工事都不能向外接龙。
     for (const b of this.buildings) {
       if (b.faction !== faction || !b.alive) continue;
-      if (b.stats.canAnchorBuild === false) continue;
+      if (b.kind !== 'constructionYard') continue;
       const dx = Math.max(b.tx - (tx + wt), tx - (b.tx + b.wt), 0);
       const dy = Math.max(b.ty - (ty + ht), ty - (b.ty + b.ht), 0);
       if (Math.hypot(dx, dy) <= BUILD_RADIUS) return true;
@@ -386,9 +386,11 @@ export class GameScene extends Phaser.Scene {
   /** AI 找位置并建造 */
   aiPlaceBuilding(kind: BuildingKind): boolean {
     const [wt, ht] = BUILDING_STATS[kind].size;
-    const own = this.buildings.filter((b) => b.faction === 'enemy' && b.alive);
+    const anchors = this.buildings.filter(
+      (b) => b.faction === 'enemy' && b.alive && b.kind === 'constructionYard',
+    );
     for (let attempt = 0; attempt < 90; attempt++) {
-      const anchor = own[Math.floor(Math.random() * own.length)];
+      const anchor = anchors[Math.floor(Math.random() * anchors.length)];
       if (!anchor) return false;
       const ang = Math.random() * Math.PI * 2;
       const dist = 3 + Math.floor(Math.random() * 5);
@@ -602,7 +604,14 @@ export class GameScene extends Phaser.Scene {
     else if (this.fog.isVisibleWorld(e.x, e.y)) this.pushMessage(`摧毁敌方${e.displayName}`);
 
     if (e instanceof Building && e.kind === 'constructionYard') {
-      this.endGame(e.faction === 'enemy' ? 'victory' : 'defeat');
+      const hasAnotherBase = this.buildings.some(
+        (b) => b !== e && b.faction === e.faction && b.alive && b.kind === 'constructionYard',
+      );
+      if (!hasAnotherBase) {
+        this.endGame(e.faction === 'enemy' ? 'victory' : 'defeat');
+      } else if (e.faction === 'player') {
+        this.pushMessage('一座前沿指挥中心被摧毁，其余基地仍在运转');
+      }
     }
   }
 
@@ -634,7 +643,7 @@ export class GameScene extends Phaser.Scene {
     const ty = Math.floor(mcv.y / TILE - ht / 2);
     for (let y = ty; y < ty + ht; y++) {
       for (let x = tx; x < tx + wt; x++) {
-        if (!this.map.isWalkable(x, y)) {
+        if (!this.map.isWalkable(x, y) || this.map.oreAt(x, y) > 0) {
           this.pushMessage('此处地形无法部署指挥中心');
           sfx.error();
           return;
@@ -742,6 +751,18 @@ export class GameScene extends Phaser.Scene {
     const ty = Math.floor(w.y / TILE - ht / 2 + 0.5);
     const ok = this.canPlace(this.placement, tx, ty, 'player');
     this.ghost.clear();
+    const range = BUILD_RADIUS * TILE;
+    this.ghost.lineStyle(2, 0x86ff7a, 0.32);
+    this.ghost.fillStyle(0x86ff7a, 0.025);
+    for (const yard of this.buildings) {
+      if (yard.faction !== 'player' || !yard.alive || yard.kind !== 'constructionYard') continue;
+      const rx = (yard.tx - BUILD_RADIUS) * TILE;
+      const ry = (yard.ty - BUILD_RADIUS) * TILE;
+      const rw = (yard.wt + BUILD_RADIUS * 2) * TILE;
+      const rh = (yard.ht + BUILD_RADIUS * 2) * TILE;
+      this.ghost.fillRoundedRect(rx, ry, rw, rh, range);
+      this.ghost.strokeRoundedRect(rx, ry, rw, rh, range);
+    }
     this.ghost.fillStyle(ok ? 0x3aff6e : 0xff4444, 0.35);
     this.ghost.fillRect(tx * TILE, ty * TILE, wt * TILE, ht * TILE);
     this.ghost.lineStyle(2, ok ? 0x3aff6e : 0xff4444, 0.9);

@@ -7,7 +7,7 @@ export const WORLD_H = MAP_H * TILE;
 
 export const START_CREDITS = 4000;
 export const ENEMY_START_CREDITS = 5000;
-export const BUILD_RADIUS = 8; // 建造范围（格）
+export const BUILD_RADIUS = 8; // 指挥中心提供的固定建造半径（格）
 export const MAX_QUEUE = 5; // 生产队列上限
 export const ORE_PER_TILE = 350; // 每格矿石价值
 export const HARVEST_RATE = 140; // 采矿速度（资金/秒）
@@ -177,7 +177,6 @@ export interface BuildingStats {
   textureKey?: string; // 无阵营差异的工事素材
   visualSize?: [number, number]; // 视觉尺寸（像素），可与占地不同
   blocksMovement?: boolean; // 默认阻挡
-  canAnchorBuild?: boolean; // 默认可延伸建造范围
   terrainEffect?: 'ground' | 'ore'; // 放置后直接修改地图格
   orePerTile?: number;
 }
@@ -257,7 +256,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     sight: 0,
     textureKey: 'tile-ground-0',
     blocksMovement: false,
-    canAnchorBuild: false,
     terrainEffect: 'ground',
   },
   rockBarrier: {
@@ -271,7 +269,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     sight: 1,
     textureKey: 'tile-rock',
     visualSize: [38, 38],
-    canAnchorBuild: false,
   },
   oreDeposit: {
     name: '人工矿脉',
@@ -284,7 +281,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     sight: 0,
     textureKey: 'tile-ore',
     blocksMovement: false,
-    canAnchorBuild: false,
     terrainEffect: 'ore',
     orePerTile: 300,
   },
@@ -299,7 +295,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     sight: 1,
     textureKey: 'prop-sandbags',
     visualSize: [58, 39],
-    canAnchorBuild: false,
   },
   antiTank: {
     name: '反坦克拒马',
@@ -312,7 +307,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     sight: 1,
     textureKey: 'prop-anti-tank',
     visualSize: [36, 36],
-    canAnchorBuild: false,
   },
   crater: {
     name: '爆破弹坑',
@@ -326,7 +320,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     textureKey: 'prop-crater',
     visualSize: [38, 38],
     blocksMovement: false,
-    canAnchorBuild: false,
   },
   wreck: {
     name: '装甲残骸',
@@ -339,7 +332,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     sight: 1,
     textureKey: 'prop-wreck',
     visualSize: [34, 43],
-    canAnchorBuild: false,
   },
   supplyCrates: {
     name: '补给箱',
@@ -352,7 +344,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     sight: 1,
     textureKey: 'prop-crates',
     visualSize: [42, 34],
-    canAnchorBuild: false,
   },
   wall: {
     name: '加固城墙',
@@ -365,7 +356,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     sight: 1,
     textureKey: 'prop-wall',
     visualSize: [62, 41],
-    canAnchorBuild: false,
   },
   beacon: {
     name: '警戒灯',
@@ -379,7 +369,6 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     textureKey: 'prop-beacon',
     visualSize: [26, 26],
     blocksMovement: false,
-    canAnchorBuild: false,
   },
 };
 

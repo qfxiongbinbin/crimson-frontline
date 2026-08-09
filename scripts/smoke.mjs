@@ -303,11 +303,11 @@ async function main() {
     const oreBefore = game.map.oreAt(5, 5);
     const mined = game.map.depleteOre(5, 5, 50);
     const oreAfter = game.map.oreAt(5, 5);
-    const remoteWall = game.placeBuilding('wall', 'player', 55, 55, true);
+    const remotePlant = game.placeBuilding('powerPlant', 'player', 55, 55, true);
     const cannotChain = !game.canPlace('wall', 57, 55, 'player');
     wall?.takeDamage(999999);
     crater?.takeDamage(999999);
-    remoteWall?.takeDamage(999999);
+    remotePlant?.takeDamage(999999);
     return {
       buttonCount: buttons.length,
       labels: buttons.map((b) => b.textContent?.trim()),
@@ -327,7 +327,53 @@ async function main() {
     fortCheck.groundPlaced && fortCheck.oreBefore === 300 && fortCheck.mined === 50 && fortCheck.oreAfter === 250,
     `ore=${fortCheck.oreBefore}→${fortCheck.oreAfter}`,
   );
-  report('工事不能接龙扩张建造范围', fortCheck.cannotChain);
+  report('普通建筑也不能接龙扩张固定建造范围', fortCheck.cannotChain);
+
+  const expansionCheck = await g(() => {
+    const game = window.__game;
+    const main = game.buildings.find(
+      (b) => b.faction === 'player' && b.alive && b.kind === 'constructionYard',
+    );
+    let spot = null;
+    for (let ty = 4; ty < 57 && !spot; ty++) {
+      for (let tx = 4; tx < 57 && !spot; tx++) {
+        if (Math.hypot(tx - main.tx, ty - main.ty) < 20) continue;
+        let clear = true;
+        for (let y = ty; y < ty + 3; y++) {
+          for (let x = tx; x < tx + 3; x++) {
+            if (!game.map.isWalkable(x, y) || game.map.oreAt(x, y) > 0) clear = false;
+          }
+        }
+        if (clear) spot = { tx, ty };
+      }
+    }
+    if (!spot) return { deployed: false, newZone: false, survivesOutpostLoss: false };
+    const mcv = game.spawnUnit('mcv', 'player', (spot.tx + 1.5) * 32, (spot.ty + 1.5) * 32);
+    game.selected = [mcv];
+    game.deployMCV();
+    const outpost = game.buildings.find(
+      (b) => b !== main && b.faction === 'player' && b.alive && b.kind === 'constructionYard',
+    );
+    let newZone = false;
+    if (outpost) {
+      for (let r = 2; r <= 7 && !newZone; r++) {
+        for (let dy = -r; dy <= r && !newZone; dy++) {
+          for (let dx = -r; dx <= r && !newZone; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            newZone = game.canPlace('beacon', outpost.tx + dx, outpost.ty + dy, 'player');
+          }
+        }
+      }
+      outpost.takeDamage(999999);
+    }
+    return {
+      deployed: !!outpost,
+      newZone,
+      survivesOutpostLoss: game.gameOver === null && main.alive,
+    };
+  });
+  report('基地工程车可在远处部署新的固定建造圈', expansionCheck.deployed && expansionCheck.newZone);
+  report('失去分基地不会在主基地存活时判负', expansionCheck.survivesOutpostLoss);
 
   // --- T9 AI 发展（必须在战斗机制的敌军清场前验证） ---
   st = await state();
