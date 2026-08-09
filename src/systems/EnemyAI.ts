@@ -21,6 +21,7 @@ export class EnemyAI {
     'warFactory',
     'repairFactory',
     'powerPlant',
+    'prismTower',
     'turret',
     'turret',
     'refinery',

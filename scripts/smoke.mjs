@@ -10,6 +10,7 @@ mkdirSync(SHOTS, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
 let page;
+let browser;
 
 function report(name, ok, detail = '') {
   results.push({ name, ok, detail });
@@ -63,12 +64,22 @@ async function buildAndWait(kind, waitMs) {
   await sleep(150);
   await page.mouse.click(spot.sx, spot.sy, { button: 'left' });
   await sleep(200);
-  await sleep(waitMs);
-  return { ok: true };
+  try {
+    await page.waitForFunction(
+      (k) => window.__game.buildings.some(
+        (b) => b.faction === 'player' && b.kind === k && b.active,
+      ),
+      { timeout: Math.max(16000, waitMs * 2 + 2000), polling: 100 },
+      kind,
+    );
+    return { ok: true };
+  } catch {
+    return { ok: false, why: `${kind} 等待完工超时` };
+  }
 }
 
 async function main() {
-  const browser = await puppeteer.launch({
+  browser = await puppeteer.launch({
     executablePath: CHROME,
     headless: true,
     args: ['--window-size=1440,900', '--mute-audio'],
@@ -162,7 +173,7 @@ async function main() {
   await shot('03-powerplant');
 
   // --- T4 建造精炼厂（附赠采矿车） ---
-  r = await buildAndWait('refinery', 8500);
+  r = await buildAndWait('refinery', 10000);
   st = await state();
   const refinery = st.buildings.find((b) => b.faction === 'player' && b.kind === 'refinery');
   const harvester = st.units.find((u) => u.faction === 'player' && u.kind === 'harvester');
@@ -203,7 +214,7 @@ async function main() {
   report('右键移动单位', selN === 1 && moved > 30 && moved < 400, `选中=${selN} 位移=${Math.round(moved)}px`);
 
   // --- T7 兵营 + 生产步兵 ---
-  r = await buildAndWait('barracks', 8500);
+  r = await buildAndWait('barracks', 10000);
   st = await state();
   const barracks = st.buildings.find((b) => b.faction === 'player' && b.kind === 'barracks');
   report('建造兵营', r.ok && !!barracks?.active, r.why || '');
@@ -364,7 +375,95 @@ async function main() {
   );
   report('单位启用伪 3D 投影、离地高度与放大层次', repairSetup.pseudo3d === true);
 
-  // --- T8b 工事页：素材、阻挡与地图工程 ---
+  // --- T8b 光棱塔：科技前置、蓄能光束与高伤害 ---
+  const prismSetup = await g(() => {
+    const game = window.__game;
+    const cy = game.buildings.find(
+      (b) => b.faction === 'player' && b.alive && b.kind === 'constructionYard',
+    );
+    const enemyCY = game.buildings.find(
+      (b) => b.faction === 'enemy' && b.alive && b.kind === 'constructionYard',
+    );
+    game.ai.think = 999;
+    for (const unit of game.units.filter((u) => u.faction === 'enemy')) {
+      unit.setPosition(enemyCY.x, enemyCY.y);
+      unit.moveTarget = null;
+      unit.attackTarget = null;
+    }
+    const button = [...document.querySelectorAll('#btn-grid .build-btn')].find(
+      (b) => b.dataset.group === 'buildings' && b.textContent?.includes('光棱塔'),
+    );
+    let spot = null;
+    for (let r = 3; r < 9 && !spot; r++) {
+      for (let dy = -r; dy <= r && !spot; dy++) {
+        for (let dx = -r; dx <= r && !spot; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const tx = cy.tx + dx;
+          const ty = cy.ty + dy;
+          if (game.canPlace('prismTower', tx, ty, 'player')) spot = { tx, ty };
+        }
+      }
+    }
+    if (!spot) return { ready: false, button: !!button };
+    const tower = game.placeBuilding('prismTower', 'player', spot.tx, spot.ty, true);
+    const target = game.spawnUnit('heavyTank', 'enemy', tower.x + 175, tower.y);
+    game.centerCamera(tower.x, tower.y);
+    game.setSelection([tower], false);
+    return {
+      ready: true,
+      button: !!button,
+      lockedWithoutWarFactory: !game.prereqMet('player', 'prismTower'),
+      towerId: tower.id,
+      targetId: target.id,
+      targetBefore: target.hp,
+      damage: tower.stats.damage,
+      glowReady: !!tower.prismGlow && !!tower.prismCore,
+    };
+  });
+  let prismFired = false;
+  if (prismSetup.ready) {
+    try {
+      await page.waitForFunction(
+        ({ targetId, targetBefore }) => {
+          const target = window.__game.units.find((u) => u.id === targetId);
+          return !!target && target.hp < targetBefore;
+        },
+        { timeout: 12000, polling: 80 },
+        prismSetup,
+      );
+      prismFired = true;
+      await sleep(35);
+    } catch {
+      prismFired = false;
+    }
+  }
+  await shot('06b-prism-tower');
+  const prismCheck = await g((setup) => {
+    const game = window.__game;
+    const tower = game.buildings.find((b) => b.id === setup.towerId);
+    const target = game.units.find((u) => u.id === setup.targetId);
+    const result = { targetAfter: target?.hp ?? 0, powered: game.powerOk('player') };
+    target?.takeDamage(999999);
+    tower?.takeDamage(999999);
+    game.clearSelection();
+    game.ai.think = 0;
+    return result;
+  }, prismSetup);
+  report(
+    '光棱塔加入建筑页并要求战车工厂前置',
+    prismSetup.button && prismSetup.lockedWithoutWarFactory,
+  );
+  report(
+    '光棱塔通电后完成蓄能并发射高伤害光束',
+    prismSetup.ready &&
+      prismFired &&
+      prismSetup.glowReady &&
+      prismCheck.powered &&
+      prismCheck.targetAfter <= prismSetup.targetBefore - prismSetup.damage,
+    `重坦 ${Math.round(prismSetup.targetBefore ?? 0)}→${Math.round(prismCheck.targetAfter)}`,
+  );
+
+  // --- T8c 工事页：素材、阻挡与地图工程 ---
   const fortCheck = await g(() => {
     const game = window.__game;
     const buttons = [...document.querySelectorAll('#btn-grid .build-btn')].filter(
@@ -482,10 +581,13 @@ async function main() {
   const fogCheck = await g(() => {
     const game = window.__game;
     const enemyCY = game.buildings.find((b) => b.faction === 'enemy' && b.kind === 'constructionYard');
-    const enemyHv = game.units.find((u) => u.faction === 'enemy');
+    const enemyHv = game.units.find((u) => u.faction === 'enemy') ??
+      game.spawnUnit('harvester', 'enemy', enemyCY.x + 30, enemyCY.y);
+    game.fog.recompute([...game.units, ...game.buildings]);
+    game.updateVisibility();
     return {
       cyExplored: game.fog.isExploredWorld(enemyCY.x, enemyCY.y),
-      hvVisible: enemyHv ? enemyHv.visible : 'none',
+      hvVisible: enemyHv.visible,
     };
   });
   report('战争迷雾遮蔽未探索区域', fogCheck.cyExplored === false && fogCheck.hvVisible === false, JSON.stringify(fogCheck));
@@ -528,7 +630,8 @@ async function main() {
   process.exit(fails > 0 ? 1 : 0);
 }
 
-main().catch((e) => {
+main().catch(async (e) => {
   console.error('冒烟测试异常中断:', e);
+  await browser?.close();
   process.exit(2);
 });

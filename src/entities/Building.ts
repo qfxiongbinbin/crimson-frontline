@@ -31,6 +31,10 @@ export class Building extends BaseEntity {
   private repairGlow: Phaser.GameObjects.Ellipse | null = null;
   private repairFxClock = 0;
   private repairFxTimer = 0;
+  private prismGlow: Phaser.GameObjects.Arc | null = null;
+  private prismCore: Phaser.GameObjects.Arc | null = null;
+  private prismFxClock = 0;
+  private prismCharge = 0;
 
   constructor(scene: GameScene, kind: BuildingKind, faction: Faction, tx: number, ty: number, instant = false) {
     const stats = BUILDING_STATS[kind];
@@ -73,6 +77,14 @@ export class Building extends BaseEntity {
       this.repairGlow = scene.add.ellipse(0, 7, 56, 20, 0x6dffd2, 0.12);
       this.repairGlow.setBlendMode(Phaser.BlendModes.ADD);
       this.add(this.repairGlow);
+    }
+    if (kind === 'prismTower') {
+      const color = faction === 'player' ? 0x62eaff : 0xb78cff;
+      this.prismGlow = scene.add.circle(0, -25, 14, color, 0.16);
+      this.prismGlow.setBlendMode(Phaser.BlendModes.ADD);
+      this.prismCore = scene.add.circle(0, -25, 3.2, 0xf4ffff, 0.85);
+      this.prismCore.setBlendMode(Phaser.BlendModes.ADD);
+      this.add([this.prismGlow, this.prismCore]);
     }
     this.rallyGfx = scene.add.graphics();
     this.add(this.rallyGfx);
@@ -168,6 +180,36 @@ export class Building extends BaseEntity {
     if (this.kind === 'powerPlant') this.updatePowerPlantEffects(dt);
     if (this.kind === 'beacon') this.updateBeaconEffects(dt);
     if (this.kind === 'repairFactory') this.updateRepairFactory(dt);
+    if (this.kind === 'prismTower') this.updatePrismTower(dt);
+  }
+
+  private updatePrismTower(dt: number): void {
+    if (!this.prismGlow || !this.prismCore) return;
+    this.prismFxClock += dt;
+    const powered = this.gs.powerOk(this.faction);
+    const color = this.faction === 'player' ? 0x62eaff : 0xb78cff;
+    const target = powered ? this.gs.findEnemyInRange(this, this.stats.range ?? 0) : null;
+    const chargeTime = this.stats.cooldown ?? 2.25;
+    if (target) {
+      this.prismCharge = Math.min(chargeTime, this.prismCharge + dt);
+      if (this.prismCharge >= chargeTime) {
+        this.gs.firePrismWeapon(this, target, this.stats.damage ?? 0);
+        this.prismCharge = 0;
+      }
+    } else {
+      this.prismCharge = Math.max(0, this.prismCharge - dt * 1.5);
+    }
+
+    const charge = this.prismCharge / chargeTime;
+    const idlePulse = 0.5 + Math.sin(this.prismFxClock * 5.2) * 0.5;
+    this.prismGlow
+      .setFillStyle(powered ? color : 0xff4e3d)
+      .setAlpha(powered ? 0.1 + idlePulse * 0.1 + charge * 0.42 : 0.035 + idlePulse * 0.025)
+      .setScale(0.82 + idlePulse * 0.12 + charge * 0.72);
+    this.prismCore
+      .setFillStyle(powered ? 0xf4ffff : 0x7a2e29)
+      .setAlpha(powered ? 0.55 + charge * 0.45 : 0.2)
+      .setScale(0.85 + charge * 0.85);
   }
 
   private updateRepairFactory(dt: number): void {
@@ -248,6 +290,14 @@ export class Building extends BaseEntity {
       this.overlay.fillStyle(0x6dffd2, 0.025);
       this.overlay.fillCircle(0, 0, range);
       this.overlay.lineStyle(1.5, 0x6dffd2, 0.42);
+      this.overlay.strokeCircle(0, 0, range);
+    }
+    if (this.selected && this.kind === 'prismTower') {
+      const range = this.stats.range ?? 0;
+      const color = this.faction === 'player' ? 0x62eaff : 0xb78cff;
+      this.overlay.fillStyle(color, 0.018);
+      this.overlay.fillCircle(0, 0, range);
+      this.overlay.lineStyle(1.5, color, 0.4);
       this.overlay.strokeCircle(0, 0, range);
     }
     if (!this.active) {

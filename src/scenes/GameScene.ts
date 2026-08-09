@@ -23,7 +23,7 @@ import { Unit } from '../entities/Unit';
 import { ENEMY_HOME, GameMap, PLAYER_HOME, T_ORE } from '../world/GameMap';
 import { FogOfWar } from '../world/FogOfWar';
 import { EnemyAI } from '../systems/EnemyAI';
-import { explosion, floatText, rallyFlag, tracer } from '../systems/Effects';
+import { explosion, floatText, prismBeam, rallyFlag, tracer } from '../systems/Effects';
 import { initSfx, sfx } from '../core/Sfx';
 
 interface DragState {
@@ -588,6 +588,13 @@ export class GameScene extends Phaser.Scene {
     target.takeDamage(damage);
     // 只有玩家视野内的交火才播音效，避免远处噪音
     if (attacker.faction === 'player' || this.fog.isVisibleWorld(attacker.x, attacker.y)) sfx.shoot();
+  }
+
+  firePrismWeapon(attacker: BaseEntity, target: BaseEntity, damage: number): void {
+    const color = attacker.faction === 'player' ? 0x62eaff : 0xb78cff;
+    prismBeam(this, attacker.x, attacker.y - 28, target.x, target.y, color);
+    target.takeDamage(damage);
+    if (attacker.faction === 'player' || this.fog.isVisibleWorld(attacker.x, attacker.y)) sfx.prism();
   }
 
   onEntityDied(e: BaseEntity): void {

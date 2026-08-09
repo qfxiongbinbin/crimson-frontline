@@ -48,6 +48,10 @@ export const sfx = {
   shoot(): void {
     tone(480 + Math.random() * 120, 0.09, 'square', 0.045, -260);
   },
+  prism(): void {
+    tone(420, 0.18, 'sine', 0.055, 920);
+    tone(1040, 0.22, 'triangle', 0.045, -180, 0.035);
+  },
   boom(big = false): void {
     noiseBurst(big ? 0.5 : 0.25, big ? 0.22 : 0.1);
     tone(big ? 90 : 130, big ? 0.45 : 0.25, 'sine', big ? 0.2 : 0.09, -60);

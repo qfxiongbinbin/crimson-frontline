@@ -220,6 +220,20 @@ function drawBuilding(g: G, kind: BuildingKind, c: (typeof FACTION_COLORS)[Facti
       g.lineBetween(w * 0.88, h * 0.3, w * 0.7, h * 0.52);
       break;
     }
+    case 'prismTower': {
+      g.fillStyle(0x262931, 1);
+      g.fillRect(w * 0.12, h * 0.58, w * 0.76, h * 0.3);
+      g.fillStyle(c.dark, 1);
+      g.fillRect(w * 0.31, h * 0.23, w * 0.38, h * 0.48);
+      g.lineStyle(3, 0x555c68, 1);
+      g.lineBetween(w * 0.18, h * 0.65, w * 0.38, h * 0.28);
+      g.lineBetween(w * 0.82, h * 0.65, w * 0.62, h * 0.28);
+      g.fillStyle(c.accent, 1);
+      g.fillTriangle(w * 0.5, h * 0.05, w * 0.34, h * 0.3, w * 0.66, h * 0.3);
+      g.lineStyle(2, 0xeaffff, 0.9);
+      g.strokeTriangle(w * 0.5, h * 0.05, w * 0.34, h * 0.3, w * 0.66, h * 0.3);
+      break;
+    }
     case 'turret': {
       g.fillStyle(c.dark, 1);
       g.fillCircle(w / 2, h / 2, 12);

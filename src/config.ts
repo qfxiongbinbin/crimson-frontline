@@ -48,6 +48,7 @@ export type BuildingKind =
   | 'warFactory'
   | 'repairFactory'
   | 'turret'
+  | 'prismTower'
   | 'groundPatch'
   | 'rockBarrier'
   | 'oreDeposit'
@@ -260,6 +261,20 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     damage: 24,
     cooldown: 0.9,
   },
+  prismTower: {
+    name: '光棱塔',
+    desc: '蓄能后发射高伤害光束，需要大量电力',
+    cost: 1250,
+    buildTime: 13,
+    hp: 520,
+    size: [2, 2],
+    visualSize: [74, 96],
+    power: -65,
+    sight: 9,
+    range: 240,
+    damage: 78,
+    cooldown: 2.25,
+  },
   groundPatch: {
     name: '工兵路面',
     desc: '铺设一块低矮战场路面，不阻挡单位',
@@ -394,6 +409,7 @@ export const BUILD_PREREQ: Partial<Record<BuildingKind, BuildingKind>> = {
   warFactory: 'refinery',
   repairFactory: 'warFactory',
   turret: 'barracks',
+  prismTower: 'warFactory',
 };
 
 export const FACTION_COLORS = {
@@ -409,6 +425,7 @@ export const BUILDING_KINDS: BuildingKind[] = [
   'warFactory',
   'repairFactory',
   'turret',
+  'prismTower',
 ];
 export const FORTIFICATION_KINDS: BuildingKind[] = [
   'groundPatch',

@@ -14,6 +14,45 @@ export function tracer(scene: GameScene, x1: number, y1: number, x2: number, y2:
   scene.tweens.add({ targets: flash, alpha: 0, scale: 0.3, duration: 110, onComplete: () => flash.destroy() });
 }
 
+/** 光棱塔的分层高能光束与棱镜命中闪光。 */
+export function prismBeam(scene: GameScene, x1: number, y1: number, x2: number, y2: number, color: number): void {
+  const halo = scene.add.line(0, 0, x1, y1, x2, y2, color, 0.24).setOrigin(0, 0).setDepth(620);
+  halo.setLineWidth(7);
+  halo.setBlendMode(Phaser.BlendModes.ADD);
+  const core = scene.add.line(0, 0, x1, y1, x2, y2, 0xf4ffff, 0.98).setOrigin(0, 0).setDepth(621);
+  core.setLineWidth(2);
+  core.setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({
+    targets: [halo, core],
+    alpha: 0,
+    duration: 230,
+    onComplete: () => {
+      halo.destroy();
+      core.destroy();
+    },
+  });
+
+  const ring = scene.add.circle(x2, y2, 6, color, 0.72).setDepth(622);
+  ring.setStrokeStyle(2, 0xffffff, 0.9).setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({
+    targets: ring,
+    scale: 3.2,
+    alpha: 0,
+    duration: 320,
+    ease: 'Cubic.easeOut',
+    onComplete: () => ring.destroy(),
+  });
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI * 2 * i) / 6 + Phaser.Math.FloatBetween(-0.18, 0.18);
+    const ray = scene.add.line(0, 0, x2, y2, x2 + Math.cos(a) * 18, y2 + Math.sin(a) * 18, color, 0.86)
+      .setOrigin(0, 0)
+      .setDepth(623)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    ray.setLineWidth(1.4);
+    scene.tweens.add({ targets: ray, alpha: 0, duration: 260, onComplete: () => ray.destroy() });
+  }
+}
+
 /** 爆炸效果 */
 export function explosion(scene: GameScene, x: number, y: number, big = false): void {
   const r = big ? 34 : 16;
