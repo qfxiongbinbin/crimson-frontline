@@ -207,12 +207,123 @@ kbd {
   position: absolute;
   top: 44px;
   right: 8px;
-  width: 208px;
-  background: rgba(14, 17, 15, 0.88);
+  width: 216px;
+  max-height: calc(100vh - 62px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #5c4a28 #111510;
+  background: linear-gradient(90deg, rgba(12, 15, 13, 0.96), rgba(22, 25, 20, 0.94));
   border: 1px solid rgba(255, 210, 122, 0.22);
   border-radius: 8px;
   padding: 8px;
   color: #e8e4d8;
+}
+
+/* 经典 RTS 雷达屏 */
+#radar {
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: #080b09;
+  border: 1px solid #5a4b2f;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 2px #171c17, 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+#radar-header {
+  height: 23px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 7px;
+  background: linear-gradient(180deg, #2a2e26, #171b17);
+  border-bottom: 1px solid #4a402b;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+#radar-title {
+  color: #d8b46a;
+  font-weight: 600;
+}
+
+#radar-status {
+  color: #807b6c;
+  font-variant-numeric: tabular-nums;
+}
+
+#radar.online #radar-status {
+  color: #8fcf7d;
+  text-shadow: 0 0 5px rgba(117, 220, 95, 0.35);
+}
+
+#radar-screen {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center, rgba(73, 94, 66, 0.2), transparent 58%),
+    repeating-linear-gradient(0deg, rgba(119, 150, 105, 0.04) 0 1px, transparent 1px 4px),
+    #050806;
+}
+
+#radar-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+#radar-screen canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: default;
+  image-rendering: pixelated;
+  transition: opacity 0.28s ease;
+}
+
+#radar.online #radar-screen canvas {
+  opacity: 1;
+  cursor: crosshair;
+}
+
+#radar-offline {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #706c60;
+  letter-spacing: 0.12em;
+  transition: opacity 0.2s ease;
+}
+
+#radar-offline::before {
+  content: '';
+  width: 34px;
+  height: 34px;
+  border: 1px solid #4a493f;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 0 26%, #34382f 27% 29%, transparent 30% 55%, #282c26 56% 58%, transparent 59%);
+}
+
+#radar-offline strong {
+  color: #918b79;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+#radar-offline span {
+  font-size: 9px;
+}
+
+#radar.online #radar-offline {
+  opacity: 0;
+  pointer-events: none;
 }
 
 #tabs {
@@ -440,23 +551,6 @@ kbd {
 
 .deploy-btn:hover {
   background: #5c4a28;
-}
-
-/* 小地图 */
-#minimap-wrap {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  padding: 3px;
-  background: rgba(14, 17, 15, 0.9);
-  border: 1px solid rgba(255, 210, 122, 0.25);
-  border-radius: 6px;
-}
-
-#minimap-wrap canvas {
-  display: block;
-  border-radius: 4px;
-  cursor: crosshair;
 }
 
 /* 胜负遮罩 */

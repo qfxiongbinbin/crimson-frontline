@@ -12,9 +12,10 @@ import {
 import type { HudSnapshot } from '../types';
 import type { GameScene } from '../scenes/GameScene';
 
-const MINIMAP_SIZE = 176;
+const MINIMAP_SIZE = 192;
+const RADAR_POWER_REQUIRED = 30;
 
-/** DOM  HUD：顶部资源栏、右侧建造面板、底部选中信息、左下小地图、胜负遮罩 */
+/** DOM HUD：顶部资源栏、右侧雷达建造面板、底部选中信息、胜负遮罩 */
 export class HUD {
   private game: Phaser.Game;
   private scene: GameScene | null = null;
@@ -27,6 +28,9 @@ export class HUD {
   private selEl!: HTMLElement;
   private minimap!: HTMLCanvasElement;
   private minimapCtx!: CanvasRenderingContext2D;
+  private radarEl!: HTMLElement;
+  private radarStatusEl!: HTMLElement;
+  private radarOnline = false;
   private terrainCache: HTMLCanvasElement | null = null;
   private overlayEl!: HTMLElement;
   private helpEl!: HTMLElement;
@@ -78,6 +82,33 @@ export class HUD {
 
     // 右侧面板
     this.panelEl = this.el('div', 'panel', root);
+
+    // 雷达：剩余电力达到门槛后才显示地图
+    this.radarEl = this.el('section', 'radar', this.panelEl);
+    const radarHeader = this.el('div', 'radar-header', this.radarEl);
+    this.el('span', 'radar-title', radarHeader, '战术雷达');
+    this.radarStatusEl = this.el('span', 'radar-status', radarHeader, '离线 · 余电 0');
+    const radarScreen = this.el('div', 'radar-screen', this.radarEl);
+    this.minimap = document.createElement('canvas');
+    this.minimap.width = MINIMAP_SIZE;
+    this.minimap.height = MINIMAP_SIZE;
+    radarScreen.appendChild(this.minimap);
+    this.minimapCtx = this.minimap.getContext('2d')!;
+    const radarOffline = this.el('div', 'radar-offline', radarScreen);
+    radarOffline.innerHTML = `<strong>雷达离线</strong><span>需要 ${RADAR_POWER_REQUIRED} 点剩余电力</span>`;
+
+    const jump = (ev: MouseEvent) => {
+      if (!this.radarOnline) return;
+      const r = this.minimap.getBoundingClientRect();
+      const wx = ((ev.clientX - r.left) / r.width) * WORLD_W;
+      const wy = ((ev.clientY - r.top) / r.height) * WORLD_H;
+      this.getScene()?.centerCamera(wx, wy);
+    };
+    this.minimap.addEventListener('mousedown', jump);
+    this.minimap.addEventListener('mousemove', (ev) => {
+      if (ev.buttons === 1) jump(ev);
+    });
+
     const tabs = this.el('div', 'tabs', this.panelEl);
     const tabB = document.createElement('button');
     tabB.textContent = '建筑';
@@ -111,24 +142,6 @@ export class HUD {
     // 选中信息
     this.selEl = this.el('div', 'selinfo', root);
 
-    // 小地图
-    const mmWrap = this.el('div', 'minimap-wrap', root);
-    this.minimap = document.createElement('canvas');
-    this.minimap.width = MINIMAP_SIZE;
-    this.minimap.height = MINIMAP_SIZE;
-    mmWrap.appendChild(this.minimap);
-    this.minimapCtx = this.minimap.getContext('2d')!;
-    const jump = (ev: MouseEvent) => {
-      const r = this.minimap.getBoundingClientRect();
-      const wx = ((ev.clientX - r.left) / r.width) * WORLD_W;
-      const wy = ((ev.clientY - r.top) / r.height) * WORLD_H;
-      this.getScene()?.centerCamera(wx, wy);
-    };
-    this.minimap.addEventListener('mousedown', jump);
-    this.minimap.addEventListener('mousemove', (ev) => {
-      if (ev.buttons === 1) jump(ev);
-    });
-
     // 帮助说明（开局自动显示）
     this.helpEl = this.el('div', 'help', root);
     this.helpEl.innerHTML = `
@@ -144,7 +157,7 @@ export class HUD {
               <li><kbd>双指轻点触控板</kbd> 或 <kbd>⌃ Ctrl</kbd>+<kbd>点按</kbd>：移动 / 点敌人攻击 / 点矿区开采</li>
               <li>选中兵营或工厂后同上操作：设置集结点</li>
               <li><kbd>双指滑动</kbd> 缩放地图</li>
-              <li>点击小地图 快速跳转视野</li>
+              <li>雷达在线时点击地图 快速跳转视野</li>
             </ul>
           </div>
           <div class="help-col">
@@ -160,7 +173,7 @@ export class HUD {
             <div class="help-h">发展路线</div>
             <ul>
               <li>① 工程车按 <kbd>F</kbd> 部署为指挥中心</li>
-              <li>② 建<b>发电站</b>供电（缺电会停产、防御塔瘫痪）</li>
+              <li>② 建<b>发电站</b>供电并点亮雷达（缺电会关闭）</li>
               <li>③ 建<b>资源精炼厂</b>，附赠采矿车自动赚钱</li>
               <li>④ 回“建筑”页，在指挥中心旁绿色区域内建<b>兵营</b></li>
               <li>⑤ 兵营完工后打开“单位”页训练<b>步兵</b></li>
@@ -259,7 +272,7 @@ export class HUD {
     this.refreshButtons(scene, snap);
     this.refreshQueue(scene, snap);
     this.refreshSelection(scene, snap);
-    this.refreshMinimap(scene);
+    this.refreshRadar(scene, snap);
     this.refreshOverlay(snap);
   }
 
@@ -337,6 +350,16 @@ export class HUD {
       btn.onclick = () => scene.uiAction('deploy');
       this.selEl.appendChild(btn);
     }
+  }
+
+  private refreshRadar(scene: GameScene, snap: HudSnapshot): void {
+    const powerReserve = snap.powerGen - snap.powerUse;
+    const online = !snap.lowPower && powerReserve >= RADAR_POWER_REQUIRED;
+    this.radarOnline = online;
+    this.radarEl.classList.toggle('online', online);
+    this.radarEl.classList.toggle('offline', !online);
+    this.radarStatusEl.textContent = `${online ? '在线' : '离线'} · 余电 ${powerReserve}`;
+    if (online) this.refreshMinimap(scene);
   }
 
   private refreshMinimap(scene: GameScene): void {
