@@ -11,6 +11,10 @@ export class Unit extends BaseEntity {
   readonly stats: UnitStats;
   readonly isBuilding = false;
   sprite: Phaser.GameObjects.Image;
+  private readonly visualSize: number;
+  private castShadow: Phaser.GameObjects.Ellipse;
+  private contactShadow: Phaser.GameObjects.Ellipse;
+  private motionClock = 0;
 
   moveTarget: { x: number; y: number } | null = null;
   attackTarget: BaseEntity | null = null;
@@ -37,7 +41,16 @@ export class Unit extends BaseEntity {
     super(scene, x, y, faction, stats.hp);
     this.kind = kind;
     this.stats = stats;
-    this.sprite = scene.add.image(0, 0, `u-${kind}-${faction}`).setDisplaySize(stats.texSize, stats.texSize);
+    const infantryScale = kind === 'infantry' || kind === 'rocket' ? 1.1 : 1.24;
+    this.visualSize = stats.texSize * infantryScale;
+    this.castShadow = scene.add.ellipse(5, 6, this.visualSize * 0.7, this.visualSize * 0.3, 0x000000, 0.38);
+    this.castShadow.setScale(1, 0.78);
+    this.addAt(this.castShadow, 0);
+    this.contactShadow = scene.add.ellipse(0, 3, this.visualSize * 0.46, this.visualSize * 0.17, 0x000000, 0.58);
+    this.addAt(this.contactShadow, 1);
+    this.sprite = scene.add
+      .image(0, -4, `u-${kind}-${faction}`)
+      .setDisplaySize(this.visualSize, this.visualSize);
     this.add(this.sprite);
     this.sprite.setDepth(0);
     if (kind === 'mcv') {
@@ -65,11 +78,11 @@ export class Unit extends BaseEntity {
   }
 
   get footW(): number {
-    return this.stats.texSize + 14;
+    return this.visualSize + 12;
   }
 
   get barY(): number {
-    return -this.stats.texSize / 2 - 12;
+    return -this.visualSize / 2 - 14;
   }
 
   get canAttack(): boolean {
@@ -112,20 +125,38 @@ export class Unit extends BaseEntity {
     } else {
       this.updateCombat(dt);
     }
-    if (this.kind === 'mcv') {
-      const moved = Phaser.Math.Distance.Between(beforeX, beforeY, this.x, this.y) > 0.05;
-      this.updateMcvEffects(dt, moved);
-    }
+    const moved = Phaser.Math.Distance.Between(beforeX, beforeY, this.x, this.y) > 0.05;
+    this.updatePseudo3d(dt, moved);
+    if (this.kind === 'mcv') this.updateMcvEffects(dt, moved);
+  }
+
+  /** 伪 3D：离地投影、车体高度与移动悬挂起伏，逻辑坐标仍保持二维网格。 */
+  private updatePseudo3d(dt: number, moving: boolean): void {
+    this.motionClock += dt;
+    const infantry = this.kind === 'infantry' || this.kind === 'rocket';
+    const amplitude = moving ? (infantry ? 0.45 : 0.85) : infantry ? 0.08 : 0.16;
+    const speed = moving ? (infantry ? 13 : 9.5) : 2.8;
+    const bob = Math.sin(this.motionClock * speed + this.id * 0.73) * amplitude;
+    const sway = moving ? Math.cos(this.motionClock * speed * 0.5 + this.id) * (infantry ? 0.25 : 0.38) : 0;
+    const lift = infantry ? -2.2 : -4.2;
+    this.sprite.setPosition(sway, lift + bob);
+    this.castShadow
+      .setPosition(5 - sway * 0.25, 6)
+      .setScale(1 - bob * 0.025, 0.78 - bob * 0.018)
+      .setAlpha(0.34 - bob * 0.018);
+    this.contactShadow.setScale(1 - bob * 0.02, 1 - bob * 0.035).setAlpha(0.54 - bob * 0.025);
+    this.setDepth(20 + this.y * 0.001);
   }
 
   private updateMcvEffects(dt: number, moving: boolean): void {
     if (!this.mcvFx || !this.mcvEngineGlow) return;
     this.mcvFxClock += dt;
-    const vibration = moving ? 0.65 : 0.38;
+    const vibration = moving ? 0.42 : 0.24;
     const jitterX = Math.sin(this.mcvFxClock * 31) * vibration;
     const jitterY = Math.cos(this.mcvFxClock * 27) * vibration * 0.65;
-    this.sprite.setPosition(jitterX, jitterY);
-    this.mcvFx.setPosition(jitterX, jitterY).setRotation(this.sprite.rotation);
+    this.mcvFx
+      .setPosition(this.sprite.x + jitterX, this.sprite.y + jitterY)
+      .setRotation(this.sprite.rotation);
 
     const enginePulse = 0.5 + Math.sin(this.mcvFxClock * 18) * 0.5;
     this.mcvEngineGlow.setAlpha(0.1 + enginePulse * 0.2).setScale(0.86 + enginePulse * 0.25);

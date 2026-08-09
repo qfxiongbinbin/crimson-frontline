@@ -46,6 +46,7 @@ export type BuildingKind =
   | 'refinery'
   | 'barracks'
   | 'warFactory'
+  | 'repairFactory'
   | 'turret'
   | 'groundPatch'
   | 'rockBarrier'
@@ -174,6 +175,8 @@ export interface BuildingStats {
   range?: number; // 防御塔射程
   damage?: number;
   cooldown?: number;
+  repairRange?: number; // 维修工厂作用半径（像素）
+  repairRate?: number; // 每个单位每秒恢复生命值
   textureKey?: string; // 无阵营差异的工事素材
   visualSize?: [number, number]; // 视觉尺寸（像素），可与占地不同
   blocksMovement?: boolean; // 默认阻挡
@@ -231,6 +234,18 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
     size: [3, 2],
     power: -40,
     sight: 5,
+  },
+  repairFactory: {
+    name: '维修工厂',
+    desc: '自动维修范围内受伤的作战单位，需要电力',
+    cost: 1000,
+    buildTime: 12,
+    hp: 760,
+    size: [3, 2],
+    power: -45,
+    sight: 5,
+    repairRange: 176,
+    repairRate: 20,
   },
   turret: {
     name: '防御塔',
@@ -377,6 +392,7 @@ export const BUILD_PREREQ: Partial<Record<BuildingKind, BuildingKind>> = {
   barracks: 'powerPlant',
   refinery: 'powerPlant',
   warFactory: 'refinery',
+  repairFactory: 'warFactory',
   turret: 'barracks',
 };
 
@@ -386,7 +402,14 @@ export const FACTION_COLORS = {
 } as const;
 
 export const UNIT_KINDS: UnitKind[] = ['infantry', 'rocket', 'lightTank', 'heavyTank', 'harvester', 'mcv'];
-export const BUILDING_KINDS: BuildingKind[] = ['powerPlant', 'refinery', 'barracks', 'warFactory', 'turret'];
+export const BUILDING_KINDS: BuildingKind[] = [
+  'powerPlant',
+  'refinery',
+  'barracks',
+  'warFactory',
+  'repairFactory',
+  'turret',
+];
 export const FORTIFICATION_KINDS: BuildingKind[] = [
   'groundPatch',
   'rockBarrier',

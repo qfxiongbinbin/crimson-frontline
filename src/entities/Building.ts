@@ -1,7 +1,7 @@
 import { BUILDING_STATS, TILE, type BuildingKind, type BuildingStats, type Faction } from '../config';
 import { BaseEntity } from './BaseEntity';
 import type { GameScene } from '../scenes/GameScene';
-import { powerPlantArc, powerPlantFlame, powerPlantSmoke } from '../systems/Effects';
+import { powerPlantArc, powerPlantFlame, powerPlantSmoke, repairBeam } from '../systems/Effects';
 
 export class Building extends BaseEntity {
   readonly kind: BuildingKind;
@@ -28,6 +28,9 @@ export class Building extends BaseEntity {
   private plantSmokeSide = 1;
   private beaconGlow: Phaser.GameObjects.Arc | null = null;
   private beaconClock = 0;
+  private repairGlow: Phaser.GameObjects.Ellipse | null = null;
+  private repairFxClock = 0;
+  private repairFxTimer = 0;
 
   constructor(scene: GameScene, kind: BuildingKind, faction: Faction, tx: number, ty: number, instant = false) {
     const stats = BUILDING_STATS[kind];
@@ -41,9 +44,13 @@ export class Building extends BaseEntity {
     this.wt = stats.size[0];
     this.ht = stats.size[1];
     const [visualW, visualH] = stats.visualSize ?? [stats.size[0] * TILE, stats.size[1] * TILE];
+    const shadow = scene.add.ellipse(5, 7, visualW * 0.82, visualH * 0.46, 0x000000, 0.42);
+    shadow.setScale(1, 0.82);
+    this.add(shadow);
     const body = scene.add
       .image(0, 0, stats.textureKey ?? `b-${kind}-${faction}`)
-      .setDisplaySize(visualW, visualH);
+      .setDisplaySize(visualW, visualH)
+      .setPosition(0, -4);
     this.add(body);
     if (kind === 'powerPlant') {
       this.plantFx = scene.add.container(0, 0);
@@ -62,13 +69,18 @@ export class Building extends BaseEntity {
       this.beaconGlow.setBlendMode(Phaser.BlendModes.ADD);
       this.add(this.beaconGlow);
     }
+    if (kind === 'repairFactory') {
+      this.repairGlow = scene.add.ellipse(0, 7, 56, 20, 0x6dffd2, 0.12);
+      this.repairGlow.setBlendMode(Phaser.BlendModes.ADD);
+      this.add(this.repairGlow);
+    }
     this.rallyGfx = scene.add.graphics();
     this.add(this.rallyGfx);
     if (kind === 'turret') {
-      this.head = scene.add.image(0, 0, `turret-head-${faction}`).setDisplaySize(44, 44);
+      this.head = scene.add.image(0, -4, `turret-head-${faction}`).setDisplaySize(44, 44);
       this.add(this.head);
     }
-    this.setDepth(15);
+    this.setDepth(20 + (ty + stats.size[1]) * TILE * 0.001);
     if (instant || stats.buildTime <= 0) {
       this.active = true;
     } else {
@@ -155,6 +167,42 @@ export class Building extends BaseEntity {
     }
     if (this.kind === 'powerPlant') this.updatePowerPlantEffects(dt);
     if (this.kind === 'beacon') this.updateBeaconEffects(dt);
+    if (this.kind === 'repairFactory') this.updateRepairFactory(dt);
+  }
+
+  private updateRepairFactory(dt: number): void {
+    if (!this.repairGlow) return;
+    this.repairFxClock += dt;
+    const powered = this.gs.powerOk(this.faction);
+    const pulse = 0.5 + Math.sin(this.repairFxClock * 6.5) * 0.5;
+    const factionColor = this.faction === 'player' ? 0x6dffd2 : 0xb99cff;
+    this.repairGlow
+      .setFillStyle(powered ? factionColor : 0xff684b)
+      .setAlpha(powered ? 0.08 + pulse * 0.17 : 0.04 + pulse * 0.03)
+      .setScale(0.9 + pulse * 0.18, 0.9 + pulse * 0.12);
+    if (!powered) return;
+
+    const range = this.stats.repairRange ?? 0;
+    const rate = this.stats.repairRate ?? 0;
+    const targets = this.gs.units.filter(
+      (u) =>
+        u.faction === this.faction &&
+        u.alive &&
+        u.canAttack &&
+        u.hp < u.maxHp &&
+        Phaser.Math.Distance.Between(this.x, this.y, u.x, u.y) <= range,
+    );
+    for (const unit of targets) unit.heal(rate * dt);
+    if (targets.length === 0 || !this.visible) return;
+
+    this.repairFxTimer -= dt;
+    if (this.repairFxTimer <= 0) {
+      this.repairFxTimer = 0.24;
+      const target = targets.reduce((best, unit) =>
+        unit.hp / unit.maxHp < best.hp / best.maxHp ? unit : best,
+      );
+      repairBeam(this.gs, this.x, this.y - 8, target.x, target.y, factionColor);
+    }
   }
 
   private updateBeaconEffects(dt: number): void {
@@ -195,6 +243,13 @@ export class Building extends BaseEntity {
 
   drawOverlay(): void {
     super.drawOverlay();
+    if (this.selected && this.kind === 'repairFactory') {
+      const range = this.stats.repairRange ?? 0;
+      this.overlay.fillStyle(0x6dffd2, 0.025);
+      this.overlay.fillCircle(0, 0, range);
+      this.overlay.lineStyle(1.5, 0x6dffd2, 0.42);
+      this.overlay.strokeCircle(0, 0, range);
+    }
     if (!this.active) {
       // 施工进度条（黄色）
       const w = Math.max(26, this.footW * 0.8);

@@ -8,6 +8,7 @@ import refineryEnemy from './buildings/refinery-enemy.png';
 import refineryPlayer from './buildings/refinery-player.png';
 import warFactoryEnemy from './buildings/warFactory-enemy.png';
 import warFactoryPlayer from './buildings/warFactory-player.png';
+import repairFactoryNeutral from './buildings/repairFactory-neutral.png';
 import turretEnemy from './buildings/turret-enemy.png';
 import turretPlayer from './buildings/turret-player.png';
 import turretHeadEnemy from './buildings/turret-head-enemy.png';
@@ -49,6 +50,8 @@ export const GENERATED_TEXTURES: Record<string, string> = {
   'b-refinery-player': refineryPlayer,
   'b-warFactory-enemy': warFactoryEnemy,
   'b-warFactory-player': warFactoryPlayer,
+  'b-repairFactory-enemy': repairFactoryNeutral,
+  'b-repairFactory-player': repairFactoryNeutral,
   'b-turret-enemy': turretEnemy,
   'b-turret-player': turretPlayer,
   'turret-head-enemy': turretHeadEnemy,

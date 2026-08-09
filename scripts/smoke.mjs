@@ -287,6 +287,83 @@ async function main() {
   }, routeProbe);
   report('单位可绕过建筑继续执行移动命令', routeCheck.found && routeCheck.reached, JSON.stringify({ ...routeCheck, targetX: routeProbe.targetX }));
 
+  // --- T8a 维修工厂：科技前置、自动回血与伪 3D 视觉层 ---
+  const repairSetup = await g(() => {
+    const game = window.__game;
+    const cy = game.buildings.find(
+      (b) => b.faction === 'player' && b.alive && b.kind === 'constructionYard',
+    );
+    const button = [...document.querySelectorAll('#btn-grid .build-btn')].find(
+      (b) => b.dataset.group === 'buildings' && b.textContent?.includes('维修工厂'),
+    );
+    const lockedWithoutWarFactory = !game.prereqMet('player', 'repairFactory');
+    let spot = null;
+    for (let r = 3; r < 9 && !spot; r++) {
+      for (let dy = -r; dy <= r && !spot; dy++) {
+        for (let dx = -r; dx <= r && !spot; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const tx = cy.tx + dx;
+          const ty = cy.ty + dy;
+          if (game.canPlace('repairFactory', tx, ty, 'player')) spot = { tx, ty };
+        }
+      }
+    }
+    if (!spot) return { ready: false, button: !!button, lockedWithoutWarFactory };
+    const factory = game.placeBuilding('repairFactory', 'player', spot.tx, spot.ty, true);
+    const tank = game.spawnUnit('lightTank', 'player', factory.x + 78, factory.y + 4);
+    const harvester = game.spawnUnit('harvester', 'player', factory.x + 116, factory.y + 4);
+    tank.takeDamage(100);
+    harvester.takeDamage(100);
+    game.centerCamera(factory.x, factory.y);
+    game.setSelection([factory], false);
+    return {
+      ready: true,
+      button: !!button,
+      lockedWithoutWarFactory,
+      factoryId: factory.id,
+      tankId: tank.id,
+      harvesterId: harvester.id,
+      tankBefore: tank.hp,
+      harvesterBefore: harvester.hp,
+      pseudo3d:
+        tank.sprite.displayWidth > tank.stats.texSize &&
+        tank.sprite.y < 0 &&
+        tank.castShadow.visible &&
+        tank.contactShadow.visible,
+    };
+  });
+  await sleep(1800);
+  await shot('06-repair-factory');
+  const repairCheck = await g((setup) => {
+    const game = window.__game;
+    const factory = game.buildings.find((b) => b.id === setup.factoryId);
+    const tank = game.units.find((u) => u.id === setup.tankId);
+    const harvester = game.units.find((u) => u.id === setup.harvesterId);
+    const result = {
+      tankAfter: tank?.hp ?? 0,
+      harvesterAfter: harvester?.hp ?? 0,
+      powered: game.powerOk('player'),
+    };
+    tank?.takeDamage(999999);
+    harvester?.takeDamage(999999);
+    factory?.takeDamage(999999);
+    game.clearSelection();
+    return result;
+  }, repairSetup);
+  report(
+    '维修工厂加入建筑页并要求战车工厂前置',
+    repairSetup.button && repairSetup.lockedWithoutWarFactory,
+  );
+  report(
+    '维修工厂自动恢复范围内作战单位且不维修采矿车',
+    repairSetup.ready &&
+      repairCheck.powered &&
+      repairCheck.tankAfter > repairSetup.tankBefore &&
+      repairCheck.harvesterAfter === repairSetup.harvesterBefore,
+    `坦克 ${Math.round(repairSetup.tankBefore ?? 0)}→${Math.round(repairCheck.tankAfter)}，采矿车 ${Math.round(repairSetup.harvesterBefore ?? 0)}→${Math.round(repairCheck.harvesterAfter)}`,
+  );
+  report('单位启用伪 3D 投影、离地高度与放大层次', repairSetup.pseudo3d === true);
+
   // --- T8b 工事页：素材、阻挡与地图工程 ---
   const fortCheck = await g(() => {
     const game = window.__game;

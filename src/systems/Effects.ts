@@ -71,6 +71,50 @@ export function floatText(scene: GameScene, x: number, y: number, text: string, 
   });
 }
 
+/** 维修工厂到受损单位的短促能量束与焊接火花。 */
+export function repairBeam(
+  scene: GameScene,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  color = 0x6dffd2,
+): void {
+  const beam = scene.add.line(0, 0, x1, y1, x2, y2 - 3, color, 0.78).setOrigin(0, 0).setDepth(610);
+  beam.setLineWidth(1.5);
+  beam.setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({
+    targets: beam,
+    alpha: 0,
+    duration: 190,
+    onComplete: () => beam.destroy(),
+  });
+
+  const pulse = scene.add.circle(x2, y2 - 3, 4, color, 0.9).setDepth(611);
+  pulse.setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({
+    targets: pulse,
+    scale: 2.1,
+    alpha: 0,
+    duration: 260,
+    onComplete: () => pulse.destroy(),
+  });
+
+  for (let i = 0; i < 3; i++) {
+    const spark = scene.add.circle(x2, y2 - 3, 1.3, 0xffdb72, 0.95).setDepth(612);
+    const a = Phaser.Math.FloatBetween(-Math.PI, Math.PI);
+    const d = Phaser.Math.Between(7, 14);
+    scene.tweens.add({
+      targets: spark,
+      x: x2 + Math.cos(a) * d,
+      y: y2 - 3 + Math.sin(a) * d,
+      alpha: 0,
+      duration: Phaser.Math.Between(180, 300),
+      onComplete: () => spark.destroy(),
+    });
+  }
+}
+
 /** 基地工程车引擎排气；移动时同时扬起履带尘土。 */
 export function engineExhaust(scene: GameScene, x: number, y: number, heading: number, moving: boolean): void {
   const backX = -Math.cos(heading);

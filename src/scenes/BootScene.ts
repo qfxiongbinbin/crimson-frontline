@@ -206,6 +206,20 @@ function drawBuilding(g: G, kind: BuildingKind, c: (typeof FACTION_COLORS)[Facti
       g.fillRect(w * 0.08, h * 0.12, 8, 8);
       break;
     }
+    case 'repairFactory': {
+      g.fillStyle(0x303138, 1);
+      g.fillRect(w * 0.08, h * 0.18, w * 0.84, h * 0.7);
+      g.fillStyle(c.dark, 1);
+      g.fillRect(w * 0.26, h * 0.38, w * 0.48, h * 0.5);
+      g.lineStyle(3, c.accent, 1);
+      g.strokeRect(w * 0.29, h * 0.41, w * 0.42, h * 0.43);
+      g.fillStyle(0xe8b23a, 1);
+      for (let i = 0; i < 5; i++) g.fillRect(w * (0.16 + i * 0.14), h * 0.2, 7, 4);
+      g.lineStyle(3, 0x51545c, 1);
+      g.lineBetween(w * 0.12, h * 0.3, w * 0.3, h * 0.52);
+      g.lineBetween(w * 0.88, h * 0.3, w * 0.7, h * 0.52);
+      break;
+    }
     case 'turret': {
       g.fillStyle(c.dark, 1);
       g.fillCircle(w / 2, h / 2, 12);

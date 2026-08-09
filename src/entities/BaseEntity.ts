@@ -53,6 +53,15 @@ export abstract class BaseEntity extends Phaser.GameObjects.Container {
     this.drawOverlay();
   }
 
+  /** 恢复生命值并返回本次实际修复量。 */
+  heal(n: number): number {
+    if (!this.alive || n <= 0 || this.hp >= this.maxHp) return 0;
+    const before = this.hp;
+    this.hp = Math.min(this.maxHp, this.hp + n);
+    this.drawOverlay();
+    return this.hp - before;
+  }
+
   drawOverlay(): void {
     const g = this.overlay;
     g.clear();
