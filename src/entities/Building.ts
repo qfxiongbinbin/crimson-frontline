@@ -1,6 +1,7 @@
 import { BUILDING_STATS, TILE, type BuildingKind, type BuildingStats, type Faction } from '../config';
 import { BaseEntity } from './BaseEntity';
 import type { GameScene } from '../scenes/GameScene';
+import { powerPlantArc, powerPlantFlame, powerPlantSmoke } from '../systems/Effects';
 
 export class Building extends BaseEntity {
   readonly kind: BuildingKind;
@@ -17,6 +18,14 @@ export class Building extends BaseEntity {
   private rallyGfx: Phaser.GameObjects.Graphics;
   private cd = 0;
   private head: Phaser.GameObjects.Image | null = null;
+  private plantFx: Phaser.GameObjects.Container | null = null;
+  private plantGlow: Phaser.GameObjects.Arc | null = null;
+  private plantStackLights: Phaser.GameObjects.Arc[] = [];
+  private plantFxClock = 0;
+  private plantSmokeTimer = 0;
+  private plantFlameTimer = 0;
+  private plantArcTimer = Phaser.Math.FloatBetween(0.8, 1.8);
+  private plantSmokeSide = 1;
 
   constructor(scene: GameScene, kind: BuildingKind, faction: Faction, tx: number, ty: number, instant = false) {
     const stats = BUILDING_STATS[kind];
@@ -33,6 +42,18 @@ export class Building extends BaseEntity {
       .image(0, 0, `b-${kind}-${faction}`)
       .setDisplaySize(stats.size[0] * TILE, stats.size[1] * TILE);
     this.add(body);
+    if (kind === 'powerPlant') {
+      this.plantFx = scene.add.container(0, 0);
+      this.plantGlow = scene.add.circle(0, 14, 15, 0xff6a1f, 0.16);
+      this.plantGlow.setBlendMode(Phaser.BlendModes.ADD);
+      const leftStack = scene.add.circle(-15, -25, 4.5, 0xff8b2d, 0.2);
+      const rightStack = scene.add.circle(15, -25, 4.5, 0xff8b2d, 0.2);
+      leftStack.setBlendMode(Phaser.BlendModes.ADD);
+      rightStack.setBlendMode(Phaser.BlendModes.ADD);
+      this.plantStackLights = [leftStack, rightStack];
+      this.plantFx.add([this.plantGlow, ...this.plantStackLights]);
+      this.add(this.plantFx);
+    }
     this.rallyGfx = scene.add.graphics();
     this.add(this.rallyGfx);
     if (kind === 'turret') {
@@ -123,6 +144,36 @@ export class Building extends BaseEntity {
           this.cd = this.stats.cooldown ?? 1;
         }
       }
+    }
+    if (this.kind === 'powerPlant') this.updatePowerPlantEffects(dt);
+  }
+
+  private updatePowerPlantEffects(dt: number): void {
+    if (!this.plantFx || !this.plantGlow) return;
+    this.plantFxClock += dt;
+    const pulse = 0.5 + Math.sin(this.plantFxClock * 8.5) * 0.5;
+    this.plantGlow.setAlpha(0.1 + pulse * 0.22).setScale(0.86 + pulse * 0.3);
+    this.plantStackLights[0]?.setAlpha(0.12 + Math.max(0, Math.sin(this.plantFxClock * 11)) * 0.36);
+    this.plantStackLights[1]?.setAlpha(0.12 + Math.max(0, -Math.sin(this.plantFxClock * 11)) * 0.36);
+    if (!this.visible) return;
+
+    this.plantSmokeTimer -= dt;
+    if (this.plantSmokeTimer <= 0) {
+      this.plantSmokeTimer = Phaser.Math.FloatBetween(0.16, 0.26);
+      this.plantSmokeSide *= -1;
+      powerPlantSmoke(this.gs, this.x + this.plantSmokeSide * 15, this.y - 27);
+    }
+
+    this.plantFlameTimer -= dt;
+    if (this.plantFlameTimer <= 0) {
+      this.plantFlameTimer = Phaser.Math.FloatBetween(0.06, 0.11);
+      powerPlantFlame(this.gs, this.x, this.y + 17);
+    }
+
+    this.plantArcTimer -= dt;
+    if (this.plantArcTimer <= 0) {
+      this.plantArcTimer = Phaser.Math.FloatBetween(1.2, 2.5);
+      powerPlantArc(this.gs, this.x - 15, this.y - 24, this.x + 15, this.y - 24);
     }
   }
 

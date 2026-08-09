@@ -2,6 +2,7 @@ import { HARVEST_RATE, MAP_H, MAP_W, TILE, UNIT_STATS, type Faction, type UnitKi
 import type { TilePos } from '../types';
 import { BaseEntity } from './BaseEntity';
 import type { GameScene } from '../scenes/GameScene';
+import { engineExhaust } from '../systems/Effects';
 
 type HarvestState = 'idle' | 'toOre' | 'harvesting' | 'toRefinery' | 'unloading';
 
@@ -19,6 +20,12 @@ export class Unit extends BaseEntity {
   private cd = 0;
   private path: { x: number; y: number }[] = [];
   private pathGoal = '';
+  private mcvFx: Phaser.GameObjects.Container | null = null;
+  private mcvEngineGlow: Phaser.GameObjects.Arc | null = null;
+  private mcvLamps: Phaser.GameObjects.Arc[] = [];
+  private mcvFxClock = 0;
+  private mcvExhaustTimer = 0;
+  private mcvExhaustSide = 1;
 
   // 采矿车状态
   hState: HarvestState = 'idle';
@@ -33,6 +40,18 @@ export class Unit extends BaseEntity {
     this.sprite = scene.add.image(0, 0, `u-${kind}-${faction}`).setDisplaySize(stats.texSize, stats.texSize);
     this.add(this.sprite);
     this.sprite.setDepth(0);
+    if (kind === 'mcv') {
+      this.mcvFx = scene.add.container(0, 0);
+      this.mcvEngineGlow = scene.add.circle(0, 16, 10, 0xff711f, 0.16);
+      this.mcvEngineGlow.setBlendMode(Phaser.BlendModes.ADD);
+      const leftLamp = scene.add.circle(-14, 10, 1.5, 0xffd45f, 0.82);
+      const rightLamp = scene.add.circle(14, 10, 1.5, 0xff3d28, 0.82);
+      leftLamp.setBlendMode(Phaser.BlendModes.ADD);
+      rightLamp.setBlendMode(Phaser.BlendModes.ADD);
+      this.mcvLamps = [leftLamp, rightLamp];
+      this.mcvFx.add([this.mcvEngineGlow, ...this.mcvLamps]);
+      this.add(this.mcvFx);
+    }
     this.setDepth(20 + y * 0.001);
     this.drawOverlay();
   }
@@ -85,12 +104,44 @@ export class Unit extends BaseEntity {
 
   update(dt: number): void {
     if (!this.alive) return;
+    const beforeX = this.x;
+    const beforeY = this.y;
     this.cd -= dt;
     if (this.kind === 'harvester') {
       this.updateHarvester(dt);
-      return;
+    } else {
+      this.updateCombat(dt);
     }
-    this.updateCombat(dt);
+    if (this.kind === 'mcv') {
+      const moved = Phaser.Math.Distance.Between(beforeX, beforeY, this.x, this.y) > 0.05;
+      this.updateMcvEffects(dt, moved);
+    }
+  }
+
+  private updateMcvEffects(dt: number, moving: boolean): void {
+    if (!this.mcvFx || !this.mcvEngineGlow) return;
+    this.mcvFxClock += dt;
+    const vibration = moving ? 0.65 : 0.38;
+    const jitterX = Math.sin(this.mcvFxClock * 31) * vibration;
+    const jitterY = Math.cos(this.mcvFxClock * 27) * vibration * 0.65;
+    this.sprite.setPosition(jitterX, jitterY);
+    this.mcvFx.setPosition(jitterX, jitterY).setRotation(this.sprite.rotation);
+
+    const enginePulse = 0.5 + Math.sin(this.mcvFxClock * 18) * 0.5;
+    this.mcvEngineGlow.setAlpha(0.1 + enginePulse * 0.2).setScale(0.86 + enginePulse * 0.25);
+    this.mcvLamps[0]?.setAlpha(0.3 + Math.max(0, Math.sin(this.mcvFxClock * 9)) * 0.7);
+    this.mcvLamps[1]?.setAlpha(0.3 + Math.max(0, -Math.sin(this.mcvFxClock * 9)) * 0.7);
+
+    this.mcvExhaustTimer -= dt;
+    if (this.mcvExhaustTimer > 0 || !this.visible) return;
+    this.mcvExhaustTimer = moving ? 0.09 : 0.16;
+    this.mcvExhaustSide *= -1;
+    const rotation = this.sprite.rotation;
+    const localX = this.mcvExhaustSide * 9;
+    const localY = 21;
+    const exhaustX = this.x + localX * Math.cos(rotation) - localY * Math.sin(rotation);
+    const exhaustY = this.y + localX * Math.sin(rotation) + localY * Math.cos(rotation);
+    engineExhaust(this.gs, exhaustX, exhaustY, rotation - Math.PI / 2, moving);
   }
 
   private updateCombat(dt: number): void {

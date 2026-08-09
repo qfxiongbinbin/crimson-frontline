@@ -11,6 +11,22 @@ function tex(scene: Phaser.Scene, key: string, w: number, h: number, draw: (g: G
   g.destroy();
 }
 
+function radialTexture(scene: Phaser.Scene, key: string, size: number): void {
+  if (scene.textures.exists(key)) return;
+  const texture = scene.textures.createCanvas(key, size, size);
+  if (!texture) return;
+  const ctx = texture.getContext();
+  const center = size / 2;
+  const gradient = ctx.createRadialGradient(center, center, 0, center, center, center);
+  gradient.addColorStop(0, 'rgba(255,255,255,0.95)');
+  gradient.addColorStop(0.28, 'rgba(255,255,255,0.72)');
+  gradient.addColorStop(0.68, 'rgba(255,255,255,0.2)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  texture.refresh();
+}
+
 // ---------- 单位贴图（统一朝上绘制，运行时旋转） ----------
 
 function drawInfantry(g: G, s: number, c: (typeof FACTION_COLORS)[Faction], rocket: boolean): void {
@@ -215,6 +231,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    radialTexture(this, 'fx-soft', 32);
     const factions: Faction[] = ['player', 'enemy'];
     for (const f of factions) {
       const c = FACTION_COLORS[f];
