@@ -12,6 +12,7 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/noto-sans-sc": "^5.3.0",
     "phaser": "^3.80.1"
   },
   "devDependencies": {

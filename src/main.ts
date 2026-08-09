@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import '@fontsource-variable/noto-sans-sc';
 import './ui/hud.css';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
